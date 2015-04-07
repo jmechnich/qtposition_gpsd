@@ -112,7 +112,7 @@ void QGeoSatelliteInfoSourceGpsd::startUpdates()
     if(!_device)
     {
       _lastError = QGeoSatelliteInfoSource::AccessError;
-      emit QGeoSatelliteInfoSource::AccessError;
+      emit QGeoSatelliteInfoSource::error(_lastError);
       return;
     }
     
