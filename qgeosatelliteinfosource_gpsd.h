@@ -5,6 +5,7 @@
 #include <QMap>
 
 class QIODevice;
+class QTimer;
 
 class QGeoSatelliteInfoSourceGpsd : public QGeoSatelliteInfoSource
 {
@@ -24,8 +25,12 @@ public slots:
 
 private slots:
   void tryReadLine();
+  void reqTimerTimeout();
   
 private:
+  static const unsigned int ReqSatellitesInView = 0x1;
+  static const unsigned int ReqSatellitesInUse  = 0x2;
+  
   bool parseNmeaData(const char* data, int size);
   void readGSA(const char* data, int size);
   void readGSV(const char* data, int size);
@@ -34,6 +39,9 @@ private:
   QMap<int,QGeoSatelliteInfo> _satellitesInView;
   Error _lastError;
   bool _running;
+  bool _wasRunning;
+  unsigned int _reqDone;
+  QTimer* _reqTimer;
 };
 
 #endif // QGEOSATELLITEINFOSOURCE_GPSD_H

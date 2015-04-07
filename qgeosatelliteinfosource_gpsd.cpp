@@ -5,6 +5,7 @@
 #include <QGeoSatelliteInfo>
 #include <QIODevice>
 #include <QDebug>
+#include <QTimer>
 
 namespace 
 {
@@ -43,7 +44,24 @@ QGeoSatelliteInfoSourceGpsd::QGeoSatelliteInfoSourceGpsd(QObject* parent)
         : QGeoSatelliteInfoSource(parent)
         , _device(0)
         , _lastError(QGeoSatelliteInfoSource::NoError)
-{}
+        , _running(false)
+        , _wasRunning(false)
+        , _reqDone(0)
+        , _reqTimer(new QTimer(this))
+{
+  _reqTimer->setSingleShot(true);
+  connect(_reqTimer,SIGNAL(timeout()),this, SLOT(reqTimerTimeout()));
+}
+
+void
+QGeoSatelliteInfoSourceGpsd::reqTimerTimeout()
+{
+  if(!_wasRunning)
+      stopUpdates();
+  
+  if(_reqDone != (ReqSatellitesInView | ReqSatellitesInUse))
+      emit requestTimeout();
+}
 
 QGeoSatelliteInfoSource::Error
 QGeoSatelliteInfoSourceGpsd::error() const
@@ -60,6 +78,9 @@ QGeoSatelliteInfoSourceGpsd::minimumUpdateInterval() const
 void
 QGeoSatelliteInfoSourceGpsd::requestUpdate(int timeout)
 {
+  if( _reqTimer->isActive())
+      return;
+  
   if( timeout == 0)
       timeout = minimumUpdateInterval();
   
@@ -68,6 +89,13 @@ QGeoSatelliteInfoSourceGpsd::requestUpdate(int timeout)
     emit requestTimeout();
     return;
   }
+  
+  _wasRunning = _running;
+  _reqDone = 0;
+
+  if(!_running)
+      startUpdates();
+  _reqTimer->start(timeout);
 }
 
 QGeoSatelliteInfoSourceGpsd::~QGeoSatelliteInfoSourceGpsd()
@@ -81,6 +109,13 @@ void QGeoSatelliteInfoSourceGpsd::startUpdates()
   if(!_running)
   {
     _device = GpsdMasterDevice::instance()->createSlave();
+    if(!_device)
+    {
+      _lastError = QGeoSatelliteInfoSource::AccessError;
+      emit QGeoSatelliteInfoSource::AccessError;
+      return;
+    }
+    
     connect(_device,SIGNAL(readyRead()),this,SLOT(tryReadLine()));
     _running = true;
   }
@@ -90,6 +125,7 @@ void QGeoSatelliteInfoSourceGpsd::stopUpdates()
 {
   if(_running)
   {
+    disconnect(_device,SIGNAL(readyRead()),this,SLOT(tryReadLine()));
     _running = false;
     GpsdMasterDevice::instance()->destroySlave(_device);
     _device = 0;
@@ -153,9 +189,20 @@ void QGeoSatelliteInfoSourceGpsd::readGSV(const char *data, int size)
   if( senIdx == senMax)
   {
     if( sats.size() != nSats)
-        qDebug() << "nSats != sats.size()!";
+        qDebug() << "nSats != sats.size()!" << nSats << sats.size();
     _satellitesInView = sats;
-    emit satellitesInViewUpdated(_satellitesInView.values());
+
+    bool emitSignal = true;
+    if(_reqTimer->isActive())
+    {
+      if(!(_reqDone & ReqSatellitesInView))
+          _reqDone |= ReqSatellitesInView;
+      if(!_wasRunning)
+          emitSignal = false;
+    }
+    
+    if(emitSignal)
+        emit satellitesInViewUpdated(_satellitesInView.values());
   }
 }
 
@@ -198,12 +245,34 @@ void QGeoSatelliteInfoSourceGpsd::readGSA(const char *data, int size)
     QMap<int,QGeoSatelliteInfo>::const_iterator mapIt =
         _satellitesInView.find(prn);
     if( mapIt == _satellitesInView.end())
-        qDebug() << "Used sat " << prn << " not found";
+        qDebug() << "Used sat" << prn << "not found";
     else
         satellitesInUse.append(mapIt.value());
   }
+
   if(satellitesInUse.size() == satsInUse.size())
+  {
+    bool emitSignal = true;
+    if(_reqTimer->isActive())
+    {
+      if(!(_reqDone & ReqSatellitesInUse))
+          _reqDone |= ReqSatellitesInUse;
+
+      if(_reqDone == (ReqSatellitesInUse | ReqSatellitesInView))
+      {
+        _reqTimer->stop();
+        if(!_wasRunning)
+            QTimer::singleShot(0, this, SLOT(stopUpdates()));
+        emit satellitesInViewUpdated( _satellitesInView.values());
+      }
+      else if(!_wasRunning)
+          emitSignal = false;
+    }
+    if(emitSignal)
+    {
       emit satellitesInUseUpdated( satellitesInUse);
+    }
+  }
 }
 
 bool QGeoSatelliteInfoSourceGpsd::parseNmeaData(const char *data, int size)
