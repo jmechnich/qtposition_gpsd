@@ -19,7 +19,7 @@ GpsdMasterDevice::GpsdMasterDevice()
         , _gpsdStarted(false)
 {
   connect(_socket, SIGNAL( readyRead()), this, SLOT( readFromSocketAndCopy()));
-  QByteArray hostname = qgetenv("GPSD_HOSTNAME");
+  QByteArray hostname = qgetenv("GPSD_HOST");
   if( !hostname.isEmpty())
       _hostname = hostname;
   QByteArray port = qgetenv("GPSD_PORT");
