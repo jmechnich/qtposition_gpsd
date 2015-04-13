@@ -25,6 +25,7 @@ void QGeoPositionInfoSourceGpsd::startUpdates()
 {
   if(!_running)
   {
+    GpsdMasterDevice::instance()->unpauseSlave(_device);
     QNmeaPositionInfoSource::startUpdates();
     _running = true;
   }
@@ -35,6 +36,7 @@ void QGeoPositionInfoSourceGpsd::stopUpdates()
   if(_running)
   {
     QNmeaPositionInfoSource::stopUpdates();
+    GpsdMasterDevice::instance()->pauseSlave(_device);
     _running = false;
   }
 }

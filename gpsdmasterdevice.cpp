@@ -16,6 +16,7 @@ GpsdMasterDevice::GpsdMasterDevice()
         : _socket( new QTcpSocket(this))
         , _hostname("localhost")
         , _port(2947)
+        , _gpsdStarted(false)
 {
   connect(_socket, SIGNAL( readyRead()), this, SLOT( readFromSocketAndCopy()));
   QByteArray hostname = qgetenv("GPSD_HOSTNAME");
@@ -35,19 +36,29 @@ void GpsdMasterDevice::readFromSocketAndCopy()
 {
   bool gotNewData = false;
   QByteArray buf;
-  for( int i=0; i<_slaves.size(); ++i)
-      _slaves[i]->seek(0);
+  SlaveListT::iterator it;
+  for( it=_slaves.begin(); it!=_slaves.end(); ++it)
+  {
+    if(it->second)
+        it->first->seek(0);
+  }
   while(_socket->canReadLine())
   {
     gotNewData = true;
     buf = _socket->readLine();
-    for( int i=0; i<_slaves.size(); ++i)
-        _slaves[i]->write(buf);
+    for( it=_slaves.begin(); it!=_slaves.end(); ++it)
+    {
+      if(it->second)
+          it->first->write(buf);
+    }
   }
   if( gotNewData)
   {
-    for( int i=0; i<_slaves.size(); ++i)
-        _slaves[i]->seek(0);
+    for( it=_slaves.begin(); it!=_slaves.end(); ++it)
+    {
+      if(it->second)
+          it->first->seek(0);
+    }
   }
 }
 
@@ -55,24 +66,21 @@ bool GpsdMasterDevice::gpsdConnect()
 {
   if( _socket->isOpen())
   {
+#ifndef QT_NO_DEBUG
     qDebug() << "Already connected to gpsd";
+#endif
     return true;
   }
   _socket->connectToHost(_hostname, _port);
   if( !_socket->isOpen())
   {
-    qDebug() << "Could not open connection to gpsd";
-    return false;
-  }
-  _socket->write("?WATCH={\"enable\":true, \"nmea\":true}\n");
-  bool status = _socket->waitForReadyRead(1000);
-  if( !status)
-  {
-    qDebug() << "No reply from gpsd";
-    _socket->close();
+    qCritical() << "Could not open connection to gpsd";
     return false;
   }
   
+#ifndef QT_NO_DEBUG
+  qDebug() << "Connected to gpsd";
+#endif
   return true;
 }
 
@@ -80,25 +88,112 @@ void GpsdMasterDevice::gpsdDisconnect()
 {
   if( !_socket->isOpen())
       return;
-  _socket->write("?WATCH={\"enable\": false}\n");
+#ifndef QT_NO_DEBUG
+  qDebug() << "Disconnecting from gpsd";
+#endif
   _socket->close();
 }
 
+bool GpsdMasterDevice::gpsdStart()
+{
+  if(!_socket->isOpen())
+      return false;
+  
+  if(!_gpsdStarted)
+  {
+#ifndef QT_NO_DEBUG
+    qDebug() << "Starting gpsd";
+#endif
+    _socket->write("?WATCH={\"enable\":true, \"nmea\":true}\n");
+    _gpsdStarted = true;
+  }
+  return true;
+}
+
+bool GpsdMasterDevice::gpsdStop()
+{
+  if(!_socket->isOpen())
+      return false;
+  
+  if(_gpsdStarted)
+  {
+#ifndef QT_NO_DEBUG
+    qDebug() << "Stopping gpsd";
+#endif
+    _socket->write("?WATCH={\"enable\": false}\n");
+    _gpsdStarted = false;
+  }
+  return true;
+}
+ 
 QIODevice* GpsdMasterDevice::createSlave()
 {
-  if(!_slaves.size())
-      if(!gpsdConnect())
-          return 0;
+  if(!_slaves.size() && !gpsdConnect())
+      return 0;
   QBuffer* slave = new QBuffer(this);
   slave->open(QIODevice::ReadWrite);
-  _slaves.append(slave);
+  _slaves.append(qMakePair(slave,false));
+#ifndef QT_NO_DEBUG
+  qDebug() << "Created slave" << slave;
+#endif
   return slave;
 }
 
 void GpsdMasterDevice::destroySlave(QIODevice* slave)
 {
-  if(_slaves.removeOne(slave))
+  SlaveListT::iterator it = _slaves.begin();
+  for(; it!=_slaves.end(); ++it)
+  {
+    if(it->first == slave)
+    {
+      _slaves.erase(it);
+#ifndef QT_NO_DEBUG
+      qDebug() << "Destroyed slave" << slave;
+#endif
       delete slave;
+      break;
+    }
+  }
   if(!_slaves.size())
-      gpsdDisconnect();
+  {
+    gpsdStop();
+    gpsdDisconnect();
+  }
+}
+
+void GpsdMasterDevice::pauseSlave(QIODevice* slave)
+{
+  bool allPaused = true;
+  SlaveListT::iterator it = _slaves.begin();
+  for(; it!=_slaves.end(); ++it)
+  {
+    if(it->first == slave)
+    {
+#ifndef QT_NO_DEBUG
+      qDebug() << "Pausing slave" << slave;
+#endif
+      it->second = false;
+    }
+    if(it->second)
+        allPaused = false;
+  }
+  if(allPaused)
+      gpsdStop();
+}
+
+void GpsdMasterDevice::unpauseSlave(QIODevice* slave)
+{
+  SlaveListT::iterator it = _slaves.begin();
+  for(; it!=_slaves.end(); ++it)
+  {
+    if(it->first == slave)
+    {
+#ifndef QT_NO_DEBUG
+      qDebug() << "Unpausing slave" << slave;
+#endif
+      it->second = true;
+      gpsdStart();
+      break;
+    }
+  }
 }

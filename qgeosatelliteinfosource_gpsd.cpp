@@ -117,6 +117,7 @@ void QGeoSatelliteInfoSourceGpsd::startUpdates()
     }
     
     connect(_device,SIGNAL(readyRead()),this,SLOT(tryReadLine()));
+    GpsdMasterDevice::instance()->unpauseSlave(_device);
     _running = true;
   }
 }
@@ -126,6 +127,7 @@ void QGeoSatelliteInfoSourceGpsd::stopUpdates()
   if(_running)
   {
     disconnect(_device,SIGNAL(readyRead()),this,SLOT(tryReadLine()));
+    GpsdMasterDevice::instance()->pauseSlave(_device);
     _running = false;
     GpsdMasterDevice::instance()->destroySlave(_device);
     _device = 0;

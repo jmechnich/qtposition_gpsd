@@ -2,7 +2,7 @@ TARGET = qtposition_gpsd
 QT = core network positioning
 
 TEMPLATE = lib
-CONFIG += plugin debug
+CONFIG += plugin
 
 HEADERS += \
     gpsdmasterdevice.h \
