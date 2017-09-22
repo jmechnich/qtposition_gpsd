@@ -42,6 +42,7 @@ GpsdMasterDevice::GpsdMasterDevice()
         , _hostname("localhost")
         , _port(2947)
         , _gpsdStarted(false)
+        , _timeout(1000)
 {
   connect(_socket, SIGNAL( readyRead()), this, SLOT( readFromSocketAndCopy()));
   QByteArray hostname = qgetenv("GPSD_HOST");
@@ -97,8 +98,9 @@ bool GpsdMasterDevice::gpsdConnect()
     return true;
   }
   _socket->connectToHost(_hostname, _port);
-  if( !_socket->isOpen())
+  if( !_socket->waitForConnected(_timeout))
   {
+    _socket->close();
     qCritical() << "Could not open connection to gpsd";
     return false;
   }

@@ -62,7 +62,8 @@ private:
   QString _hostname;
   quint16 _port;
   bool _gpsdStarted;
-  
+  int _timeout;
+
   static GpsdMasterDevice* _instance;
 };
 
