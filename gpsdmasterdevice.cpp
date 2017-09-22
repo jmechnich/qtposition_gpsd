@@ -92,7 +92,7 @@ bool GpsdMasterDevice::gpsdConnect()
   if( _socket->isOpen())
   {
 #ifndef QT_NO_DEBUG
-    qDebug() << "Already connected to gpsd";
+    qInfo() << "Already connected to gpsd";
 #endif
     return true;
   }
@@ -104,7 +104,7 @@ bool GpsdMasterDevice::gpsdConnect()
   }
   
 #ifndef QT_NO_DEBUG
-  qDebug() << "Connected to gpsd";
+  qInfo() << "Connected to gpsd";
 #endif
   return true;
 }
@@ -114,7 +114,7 @@ void GpsdMasterDevice::gpsdDisconnect()
   if( !_socket->isOpen())
       return;
 #ifndef QT_NO_DEBUG
-  qDebug() << "Disconnecting from gpsd";
+  qInfo() << "Disconnecting from gpsd";
 #endif
   _socket->close();
 }
@@ -127,7 +127,7 @@ bool GpsdMasterDevice::gpsdStart()
   if(!_gpsdStarted)
   {
 #ifndef QT_NO_DEBUG
-    qDebug() << "Starting gpsd";
+    qInfo() << "Starting gpsd";
 #endif
     _socket->write("?WATCH={\"enable\":true, \"nmea\":true}\n");
     _gpsdStarted = true;
@@ -143,7 +143,7 @@ bool GpsdMasterDevice::gpsdStop()
   if(_gpsdStarted)
   {
 #ifndef QT_NO_DEBUG
-    qDebug() << "Stopping gpsd";
+    qInfo() << "Stopping gpsd";
 #endif
     _socket->write("?WATCH={\"enable\": false}\n");
     _gpsdStarted = false;
@@ -159,7 +159,7 @@ QIODevice* GpsdMasterDevice::createSlave()
   slave->open(QIODevice::ReadWrite);
   _slaves.append(qMakePair(slave,false));
 #ifndef QT_NO_DEBUG
-  qDebug() << "Created slave" << slave;
+  qInfo() << "Created slave" << slave;
 #endif
   return slave;
 }
@@ -173,7 +173,7 @@ void GpsdMasterDevice::destroySlave(QIODevice* slave)
     {
       _slaves.erase(it);
 #ifndef QT_NO_DEBUG
-      qDebug() << "Destroyed slave" << slave;
+      qInfo() << "Destroyed slave" << slave;
 #endif
       delete slave;
       break;
@@ -195,7 +195,7 @@ void GpsdMasterDevice::pauseSlave(QIODevice* slave)
     if(it->first == slave)
     {
 #ifndef QT_NO_DEBUG
-      qDebug() << "Pausing slave" << slave;
+      qInfo() << "Pausing slave" << slave;
 #endif
       it->second = false;
     }
@@ -214,7 +214,7 @@ void GpsdMasterDevice::unpauseSlave(QIODevice* slave)
     if(it->first == slave)
     {
 #ifndef QT_NO_DEBUG
-      qDebug() << "Unpausing slave" << slave;
+      qInfo() << "Unpausing slave" << slave;
 #endif
       it->second = true;
       gpsdStart();

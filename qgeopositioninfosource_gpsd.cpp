@@ -27,8 +27,6 @@
 
 #include "gpsdmasterdevice.h"
 
-#include <QDebug>
-
 QGeoPositionInfoSourceGpsd::QGeoPositionInfoSourceGpsd(QObject *parent)
         : QNmeaPositionInfoSource(QNmeaPositionInfoSource::RealTimeMode, parent)
         , _device(0)

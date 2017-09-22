@@ -216,7 +216,7 @@ void QGeoSatelliteInfoSourceGpsd::readGSV(const char *data, int size)
   if( senIdx == senMax)
   {
     if( sats.size() != nSats)
-        qDebug() << "nSats != sats.size()!" << nSats << sats.size();
+        qInfo() << "nSats != sats.size()!" << nSats << sats.size();
     _satellitesInView = sats;
 
     bool emitSignal = true;
@@ -272,7 +272,7 @@ void QGeoSatelliteInfoSourceGpsd::readGSA(const char *data, int size)
     QMap<int,QGeoSatelliteInfo>::const_iterator mapIt =
         _satellitesInView.find(prn);
     if( mapIt == _satellitesInView.end())
-        qDebug() << "Used sat" << prn << "not found";
+        qInfo() << "Used sat" << prn << "not found";
     else
         satellitesInUse.append(mapIt.value());
   }
